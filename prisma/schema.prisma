@@ -1,0 +1,580 @@
+// This is your Prisma schema file
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── AUTHENTICATION & USERS ───────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  password     String?
+  avatar       String?
+  phone        String?
+  role         UserRole @default(CAMPAIGN_MANAGER)
+  department   String?
+  isActive     Boolean  @default(true)
+  lastLogin    DateTime?
+  twoFactorEnabled Boolean @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  campaigns    Campaign[]   @relation("CampaignOwner")
+  clients      Client[]     @relation("ClientManager")
+  notifications Notification[]
+  auditLogs    AuditLog[]
+  tasks        Task[]       @relation("TaskAssignee")
+  createdTasks Task[]       @relation("TaskCreator")
+  documents    Document[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  CAMPAIGN_MANAGER
+  MEDIA_PLANNER
+  MEDIA_BUYER
+  FINANCE_MANAGER
+  VENDOR
+  INSTALLATION_TEAM
+  CREATIVE_TEAM
+  MARKETING_TEAM
+  CLIENT
+}
+
+// ─── CLIENT CRM ───────────────────────────────────────────────────────────────
+
+model Client {
+  id           String       @id @default(cuid())
+  name         String
+  company      String
+  email        String?
+  phone        String?
+  address      String?
+  city         String?
+  state        String?
+  gstin        String?
+  pan          String?
+  industry     String?
+  segment      ClientSegment @default(SME)
+  status       ClientStatus @default(LEAD)
+  rating       Int          @default(0)
+  avatar       String?
+  website      String?
+  notes        String?
+  managerId    String?
+  manager      User?        @relation("ClientManager", fields: [managerId], references: [id])
+  totalRevenue Float        @default(0)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  // Relations
+  campaigns    Campaign[]
+  invoices     Invoice[]
+  contacts     Contact[]
+  meetings     Meeting[]
+  tasks        Task[]
+  documents    Document[]
+
+  @@map("clients")
+}
+
+enum ClientSegment {
+  ENTERPRISE
+  MID_MARKET
+  SME
+  STARTUP
+  GOVERNMENT
+  NGO
+}
+
+enum ClientStatus {
+  LEAD
+  PROSPECT
+  ACTIVE
+  INACTIVE
+  CHURNED
+}
+
+model Contact {
+  id        String   @id @default(cuid())
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name      String
+  email     String?
+  phone     String?
+  designation String?
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("contacts")
+}
+
+// ─── CAMPAIGNS ────────────────────────────────────────────────────────────────
+
+model Campaign {
+  id           String         @id @default(cuid())
+  name         String
+  clientId     String
+  client       Client         @relation(fields: [clientId], references: [id])
+  ownerId      String?
+  owner        User?          @relation("CampaignOwner", fields: [ownerId], references: [id])
+  status       CampaignStatus @default(DRAFT)
+  type         CampaignType   @default(OOH)
+  objective    String?
+  description  String?
+  startDate    DateTime
+  endDate      DateTime
+  budget       Float
+  spent        Float          @default(0)
+  cities       String         // JSON array
+  industry     String?
+  audience     String?
+  targetReach  Int?
+  actualReach  Int?
+  impressions  Int?
+  roi          Float?
+  notes        String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  // Relations
+  items        CampaignItem[]
+  invoices     Invoice[]
+  documents    Document[]
+  tasks        Task[]
+  creatives    Creative[]
+
+  @@map("campaigns")
+}
+
+enum CampaignStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  ACTIVE
+  COMPLETED
+  ON_HOLD
+  CANCELLED
+}
+
+enum CampaignType {
+  OOH
+  MALL_MEDIA
+  RETAIL_BRANDING
+  TRANSIT
+  EXPERIENTIAL
+  DIGITAL
+  MIXED
+}
+
+model CampaignItem {
+  id           String      @id @default(cuid())
+  campaignId   String
+  campaign     Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  mediaAssetId String?
+  mediaAsset   MediaAsset? @relation(fields: [mediaAssetId], references: [id])
+  quantity     Int         @default(1)
+  startDate    DateTime
+  endDate      DateTime
+  rate         Float
+  total        Float
+  status       BookingStatus @default(PENDING)
+  notes        String?
+  createdAt    DateTime    @default(now())
+
+  @@map("campaign_items")
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+// ─── OOH MEDIA INVENTORY ──────────────────────────────────────────────────────
+
+model MediaAsset {
+  id            String      @id @default(cuid())
+  name          String
+  type          MediaType
+  subType       String?
+  vendorId      String?
+  vendor        Vendor?     @relation(fields: [vendorId], references: [id])
+  city          String
+  state         String?
+  address       String?
+  latitude      Float?
+  longitude     Float?
+  width         Float?
+  height        Float?
+  facing        String?
+  illumination  IlluminationType @default(BACKLIT)
+  trafficCount  Int?
+  monthlyReach  Int?
+  monthlyRate   Float
+  isAvailable   Boolean     @default(true)
+  photos        String?     // JSON array of URLs
+  status        AssetStatus @default(ACTIVE)
+  notes         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  // Relations
+  campaignItems CampaignItem[]
+  bookings      Booking[]
+
+  @@map("media_assets")
+}
+
+enum MediaType {
+  BILLBOARD
+  UNIPOLE
+  GANTRY
+  BUS_SHELTER
+  METRO_PANEL
+  AIRPORT
+  RAILWAY
+  DIGITAL_LED
+  TRANSIT
+  STREET_FURNITURE
+  WALL_WRAP
+  BUILDING_WRAP
+  DIGITAL_SCREEN
+  MALL_ATRIUM
+  MALL_ESCALATOR
+  MALL_FOOD_COURT
+  MALL_LED_WALL
+  MALL_KIOSK
+  RETAIL_STORE
+  RETAIL_WINDOW
+  RETAIL_SHELF
+  RETAIL_POSM
+}
+
+enum IlluminationType {
+  BACKLIT
+  FRONTLIT
+  LED
+  DIGITAL
+  NON_LIT
+}
+
+enum AssetStatus {
+  ACTIVE
+  MAINTENANCE
+  INACTIVE
+  BOOKED
+}
+
+model Booking {
+  id           String      @id @default(cuid())
+  mediaAssetId String
+  mediaAsset   MediaAsset  @relation(fields: [mediaAssetId], references: [id])
+  startDate    DateTime
+  endDate      DateTime
+  status       BookingStatus @default(PENDING)
+  rate         Float
+  notes        String?
+  createdAt    DateTime    @default(now())
+
+  @@map("bookings")
+}
+
+// ─── VENDORS ──────────────────────────────────────────────────────────────────
+
+model Vendor {
+  id            String       @id @default(cuid())
+  name          String
+  company       String?
+  email         String?
+  phone         String?
+  address       String?
+  city          String?
+  gstin         String?
+  pan           String?
+  type          VendorType   @default(MEDIA_OWNER)
+  rating        Float        @default(0)
+  totalPaid     Float        @default(0)
+  status        VendorStatus @default(ACTIVE)
+  bankDetails   String?      // JSON
+  notes         String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  // Relations
+  mediaAssets   MediaAsset[]
+  purchaseOrders PurchaseOrder[]
+  payments      VendorPayment[]
+
+  @@map("vendors")
+}
+
+enum VendorType {
+  MEDIA_OWNER
+  PRINTER
+  FABRICATOR
+  INSTALLATION
+  ELECTRICIAN
+  TRANSPORT
+  EVENT_AGENCY
+}
+
+enum VendorStatus {
+  ACTIVE
+  INACTIVE
+  BLACKLISTED
+}
+
+// ─── FINANCE ──────────────────────────────────────────────────────────────────
+
+model Invoice {
+  id           String        @id @default(cuid())
+  invoiceNo    String        @unique
+  clientId     String
+  client       Client        @relation(fields: [clientId], references: [id])
+  campaignId   String?
+  campaign     Campaign?     @relation(fields: [campaignId], references: [id])
+  amount       Float
+  tax          Float         @default(0)
+  total        Float
+  status       InvoiceStatus @default(DRAFT)
+  dueDate      DateTime?
+  paidDate     DateTime?
+  notes        String?
+  items        String?       // JSON array
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@map("invoices")
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+model PurchaseOrder {
+  id         String     @id @default(cuid())
+  poNo       String     @unique
+  vendorId   String
+  vendor     Vendor     @relation(fields: [vendorId], references: [id])
+  amount     Float
+  tax        Float      @default(0)
+  total      Float
+  status     POStatus   @default(DRAFT)
+  dueDate    DateTime?
+  items      String?    // JSON array
+  notes      String?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@map("purchase_orders")
+}
+
+enum POStatus {
+  DRAFT
+  SENT
+  APPROVED
+  RECEIVED
+  CANCELLED
+}
+
+model VendorPayment {
+  id        String   @id @default(cuid())
+  vendorId  String
+  vendor    Vendor   @relation(fields: [vendorId], references: [id])
+  amount    Float
+  method    String?
+  reference String?
+  date      DateTime @default(now())
+  notes     String?
+  createdAt DateTime @default(now())
+
+  @@map("vendor_payments")
+}
+
+// ─── INVENTORY ────────────────────────────────────────────────────────────────
+
+model InventoryItem {
+  id          String       @id @default(cuid())
+  name        String
+  category    InventoryCategory
+  unit        String
+  quantity    Float        @default(0)
+  minStock    Float        @default(0)
+  rate        Float        @default(0)
+  vendor      String?
+  warehouse   String?
+  barcode     String?
+  notes       String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@map("inventory_items")
+}
+
+enum InventoryCategory {
+  FLEX
+  VINYL
+  LED
+  FRAME
+  ACP
+  PRINT_MATERIAL
+  HARDWARE
+  OTHER
+}
+
+// ─── CREATIVE MANAGEMENT ──────────────────────────────────────────────────────
+
+model Creative {
+  id           String         @id @default(cuid())
+  campaignId   String
+  campaign     Campaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  name         String
+  type         String
+  fileUrl      String?
+  status       CreativeStatus @default(PENDING)
+  feedback     String?
+  version      Int            @default(1)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@map("creatives")
+}
+
+enum CreativeStatus {
+  PENDING
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  REVISION_REQUESTED
+}
+
+// ─── TASKS & MEETINGS ─────────────────────────────────────────────────────────
+
+model Task {
+  id          String     @id @default(cuid())
+  title       String
+  description String?
+  assigneeId  String?
+  assignee    User?      @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  creatorId   String?
+  creator     User?      @relation("TaskCreator", fields: [creatorId], references: [id])
+  clientId    String?
+  client      Client?    @relation(fields: [clientId], references: [id])
+  campaignId  String?
+  campaign    Campaign?  @relation(fields: [campaignId], references: [id])
+  priority    TaskPriority @default(MEDIUM)
+  status      TaskStatus   @default(TODO)
+  dueDate     DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@map("tasks")
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  REVIEW
+  DONE
+  CANCELLED
+}
+
+model Meeting {
+  id        String   @id @default(cuid())
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id])
+  title     String
+  date      DateTime
+  duration  Int?
+  location  String?
+  notes     String?
+  createdAt DateTime @default(now())
+
+  @@map("meetings")
+}
+
+// ─── DOCUMENTS ────────────────────────────────────────────────────────────────
+
+model Document {
+  id          String       @id @default(cuid())
+  name        String
+  type        DocumentType
+  fileUrl     String?
+  clientId    String?
+  client      Client?      @relation(fields: [clientId], references: [id])
+  campaignId  String?
+  campaign    Campaign?    @relation(fields: [campaignId], references: [id])
+  createdById String?
+  createdBy   User?        @relation(fields: [createdById], references: [id])
+  createdAt   DateTime     @default(now())
+
+  @@map("documents")
+}
+
+enum DocumentType {
+  QUOTATION
+  PROPOSAL
+  AGREEMENT
+  PURCHASE_ORDER
+  INVOICE
+  CAMPAIGN_REPORT
+  COMPLETION_REPORT
+  OTHER
+}
+
+// ─── NOTIFICATIONS & AUDIT ────────────────────────────────────────────────────
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      String   @default("info")
+  isRead    Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+
+  @@map("notifications")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  entity    String
+  entityId  String?
+  oldValue  String?
+  newValue  String?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@map("audit_logs")
+}

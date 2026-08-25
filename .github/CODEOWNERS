@@ -1,0 +1,12 @@
+# CODEOWNERS - MediaSphere AI
+# Sole Code Owner and License Authority
+
+# Pushkar retains exclusive ownership and review authority over all code and license files
+* @pushka2006
+
+# Critical License & Legal files
+/LICENSE @pushka2006
+/LICENSE.md @pushka2006
+/.github/ @pushka2006
+/src/lib/licenseGuard.ts @pushka2006
+/src/middleware.ts @pushka2006
