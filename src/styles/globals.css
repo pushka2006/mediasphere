@@ -1,4 +1,5 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap");
+@import "leaflet/dist/leaflet.css";
 
 @tailwind base;
 @tailwind components;
@@ -418,12 +419,18 @@ body {
 
 /* ─── Map Overrides ───────────────────────────────────────────────────────────── */
 .leaflet-container {
-  background: #0c1220 !important;
+  width: 100% !important;
+  height: 100% !important;
+  background: #080e1a !important;
   border-radius: 0.75rem;
   font-family: "Inter", sans-serif !important;
 }
 .leaflet-tile {
   filter: brightness(0.95) contrast(1.05);
+}
+.custom-map-pin {
+  background: transparent !important;
+  border: none !important;
 }
 .leaflet-control-zoom {
   border: 1px solid rgba(255,255,255,0.1) !important;
