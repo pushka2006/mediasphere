@@ -423,7 +423,7 @@ body {
   font-family: "Inter", sans-serif !important;
 }
 .leaflet-tile {
-  filter: brightness(0.6) saturate(0.4) hue-rotate(200deg);
+  filter: brightness(0.95) contrast(1.05);
 }
 .leaflet-control-zoom {
   border: 1px solid rgba(255,255,255,0.1) !important;
